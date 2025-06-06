@@ -2,6 +2,8 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const port = 3042;
+const { toHex, utf8ToBytes, hexToBytes } = require("ethereum-cryptography/utils");
+const  secp256k1 = require("ethereum-cryptography/secp256k1");
 
 app.use(cors());
 app.use(express.json());
@@ -19,20 +21,27 @@ app.get("/balance/:address", (req, res) => {
 });
 
 app.post("/send", (req, res) => {
-  // TODO: get a signature from the client-side
-  // TODO: recover public address from the signature
+  const { sender, recipient, amount, txHash, signature, publicKey } = req.body;
 
-  const { sender, recipient, amount } = req.body;
+  const signatureBytes = hexToBytes(signature);
+  const publicKeyBytes = hexToBytes(publicKey);
+  const txHashBytes = hexToBytes(txHash);
+
+  const isValid = secp256k1.verify(signatureBytes, txHashBytes, publicKeyBytes);
+  if (!isValid) {
+    return res.status(400).send({ message: "Invalid signature!" });
+  }
 
   setInitialBalance(sender);
   setInitialBalance(recipient);
 
+  console.log(balances[sender]);
   if (balances[sender] < amount) {
-    res.status(400).send({ message: "Not enough funds!" });
+   return res.status(400).send({ message: "Not enough funds!" });
   } else {
     balances[sender] -= amount;
     balances[recipient] += amount;
-    res.send({ balance: balances[sender] });
+    return res.send({ balance: balances[sender] });
   }
 });
 
@@ -42,6 +51,6 @@ app.listen(port, () => {
 
 function setInitialBalance(address) {
   if (!balances[address]) {
-    balances[address] = 0;
+    balances[address] = 100;
   }
 }
